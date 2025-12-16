@@ -14,6 +14,7 @@ int main()
             count++;
         }
     }
+    
     cout << endl;
     cout << count * 2 - 1 << endl;
     return 0;
