@@ -6,26 +6,40 @@ int main()
     int n, q;
     cin >> n >> q;
 
-    vector<int> a(n);
-    for (int i = 1; i <= n; i++)
+    int a[n];
+    for (int i = 0; i < n; i++)
     {
         cin >> a[i];
     }
-
+    sort(a, a + n);
     for (int i = 1; i <= q; i++)
     {
-        int x;
-        cin >> x;
-        int flag = 1;
-        for (int i = 1; i <= n; i++)
+        int val;
+        cin >> val;
+        int l = 0;
+        int r = n - 1;
+
+        int flg = 1;
+        while (l <= r)
         {
-            if (a[i] == x)
+            int mid = (l + r) / 2;
+
+            if (a[mid] == val)
             {
-                flag = 0;
+                flg = 0;
+                break;
+            }
+            else if (a[mid] < val)
+            {
+                l = mid + 1;
+            }
+            else
+            {
+                r = mid - 1;
             }
         }
 
-        if (flag == 0)
+        if (flg == 0)
         {
             cout << "found" << endl;
         }
