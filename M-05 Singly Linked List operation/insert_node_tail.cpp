@@ -14,12 +14,12 @@ public:
     }
 };
 
-void insert_head(Node *&head, int val)
+void insert_tail(Node *&head, int val)
 {
     Node *newnode = new Node(val);
-    newnode->next = head;
+    
 
-    head = newnode;
+    
 }
 
 
@@ -42,6 +42,6 @@ int main()
 
     head->next = a;
     a->next = b;
-    insert_head(head, 300);
+    insert_tail(head, 300);
     print_list(head);
 }
