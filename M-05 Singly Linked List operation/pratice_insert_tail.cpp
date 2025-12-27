@@ -16,42 +16,49 @@ public:
 
 void insert_tail(Node *&head, int val)
 {
+
     Node *newnode = new Node(val);
+
+    if (head == NULL)
+    {
+        head = newnode;
+        return;
+    }
     
-    Node * tmp = head;
+    Node *tmp = head;
+
     while (tmp->next != NULL)
     {
         tmp = tmp->next;
     }
 
     tmp->next = newnode;
-    
-
 }
-
 
 void print_list(Node *head)
 {
+
     Node *tmp = head;
     while (tmp != NULL)
     {
         cout << tmp->val << endl;
+
         tmp = tmp->next;
     }
 }
 
 int main()
 {
+    Node *head = NULL;
+    // Node *a = new Node(20);
+    // Node *b = new Node(30);
+    // head->next = a;
+    // a->next = b;
 
-    Node *head = new Node(10);
-    Node *a = new Node(20);
-    Node *b = new Node(30);
-
-    head->next = a;
-    a->next = b;
-    
-    insert_tail(head, 100);
     insert_tail(head, 200);
     insert_tail(head, 300);
+    insert_tail(head, 400);
+    insert_tail(head, 500);
+
     print_list(head);
 }

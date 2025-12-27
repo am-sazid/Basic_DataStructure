@@ -1,11 +1,11 @@
 #include <bits/stdc++.h>
 using namespace std;
 
-void fun(int * p)
+void fun(int * &p)
 {
     // int y = 100;
     p = NULL;
-    cout << p << endl;
+    // cout << p << endl;
 }
 
 int main()
