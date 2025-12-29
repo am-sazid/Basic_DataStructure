@@ -49,11 +49,11 @@ void print_list(Node *head)
 
 int main()
 {
-    Node *head = NULL;
-    // Node *a = new Node(20);
-    // Node *b = new Node(30);
-    // head->next = a;
-    // a->next = b;
+    Node *head = new Node(10);
+    Node *a = new Node(20);
+    Node *b = new Node(30);
+    head->next = a;
+    a->next = b;
 
     insert_tail(head, 200);
     insert_tail(head, 300);
