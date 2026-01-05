@@ -28,28 +28,28 @@ void insert_tail(Node *&head, Node *&tail, int val)
     tail = newnode;
 }
 
-// void print_list(Node* head)
-// {
-//     Node* tmp = head;
-
-//     while (tmp != NULL)
-//     {
-//         cout<<tmp->val<<endl;
-//         tmp = tmp->next;
-//     }
-
-// }
-
-void print_reverse(Node *tmp)
+void print_list(Node* head)
 {
+    Node* tmp = head;
 
-    if (tmp == NULL)
+    while (tmp != NULL)
     {
-        return;
+        cout<<tmp->val<<endl;
+        tmp = tmp->next;
     }
-    print_reverse(tmp->next);
-    cout << tmp->val << endl;
+
 }
+
+// void print_reverse(Node *tmp)
+// {
+
+//     if (tmp == NULL)
+//     {
+//         return;
+//     }
+//     print_reverse(tmp->next);
+//     cout << tmp->val << endl;
+// }   
 
 int main()
 {
@@ -66,8 +66,8 @@ int main()
         insert_tail(head, tail, val);
     }
 
-    // print_list(head);
-    print_reverse(head);
+    print_list(head);
+    // print_reverse(head);
 
     return 0;
 }
