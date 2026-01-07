@@ -10,28 +10,30 @@ public:
     Node(int val)
     {
         this->val = val;
-        this->next = NULL;
-        this->prev = NULL;
+        this->next = next;
+        this->prev = prev;
     }
 };
 
-void print_forward(Node *head)
+void insert_at_head(Node *&head, int val)
+{
+    Node *newnode = new Node(val);
+
+    newnode->val = val;
+    newnode->next = head;
+    head->prev = newnode;
+
+    head = newnode;
+}
+
+void print_list(Node *head)
 {
     Node *tmp = head;
+
     while (tmp != NULL)
     {
         cout << tmp->val << " ";
         tmp = tmp->next;
-    }
-    cout << endl;
-}
-void print_backward(Node *tail)
-{
-    Node *tmp = tail;
-    while (tmp != NULL)
-    {
-        cout << tmp->val << " ";
-        tmp = tmp->prev;
     }
     cout << endl;
 }
@@ -48,7 +50,6 @@ int main()
     a->next = tail;
     tail->prev = a;
 
-    print_forward(head);
-    print_backward(tail);
-    return 0;
+    insert_at_head(head, 60);
+    print_list(head);
 }
