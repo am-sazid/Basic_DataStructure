@@ -51,5 +51,7 @@ int main()
     tail->prev = a;
 
     insert_at_head(head, 60);
+    insert_at_head(head, 70);
+    insert_at_head(head, 80);
     print_list(head);
 }
