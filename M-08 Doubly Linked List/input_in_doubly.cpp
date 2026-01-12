@@ -48,6 +48,7 @@ int main()
     int val;
     while (true)
     {
+        cin>> val;
         if(val == -1){
             break;
         }
