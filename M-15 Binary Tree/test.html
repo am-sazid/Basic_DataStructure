@@ -1,0 +1,1674 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Real-time Blood Donation Management System</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Google Sheets API -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <style>
+      * {
+        font-family: 'Inter', sans-serif;
+      }
+      .blood-group {
+        transition: all 0.3s ease;
+      }
+      .blood-group.active {
+        transform: scale(1.05);
+        box-shadow: 0 10px 25px -5px rgba(220, 38, 38, 0.2);
+      }
+      .donor-card {
+        transition: all 0.3s ease;
+      }
+      .donor-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+      }
+      .pulse {
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.7; }
+        100% { opacity: 1; }
+      }
+      .last-updated {
+        font-size: 0.75rem;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-50">
+    <div class="min-h-screen flex flex-col">
+      <!-- Header with real-time indicator -->
+      <header class="bg-gradient-to-r from-red-600 to-red-800 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+          <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <div class="flex items-center">
+                <h1 class="text-2xl md:text-3xl font-bold">
+                  <i class="fas fa-heartbeat mr-3"></i>
+                  Real-time Blood Donation System
+                </h1>
+                <div id="realtime-indicator" class="ml-3 bg-green-500 text-white text-xs px-2 py-1 rounded-full flex items-center hidden">
+                  <div class="w-2 h-2 bg-white rounded-full mr-1 pulse"></div>
+                  LIVE
+                </div>
+              </div>
+              <p class="text-red-100 mt-1 text-sm">Connected to Google Sheets - Auto updates every 30 seconds</p>
+              <div class="flex items-center mt-2 text-red-200 text-sm">
+                <i class="fas fa-clock mr-2"></i>
+                Last updated: <span id="last-updated-time" class="font-medium ml-1">Just now</span>
+                <button id="manual-refresh" class="ml-4 text-white hover:text-red-100">
+                  <i class="fas fa-redo-alt mr-1"></i>Refresh Now
+                </button>
+              </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+              <div class="bg-white bg-opacity-20 backdrop-blur-sm rounded-full px-4 py-2">
+                <i class="fas fa-users mr-2"></i>
+                <span id="total-donors" class="font-bold">0</span> Active Donors
+              </div>
+              <button id="add-donor-btn" class="bg-white text-red-600 hover:bg-red-50 font-medium px-4 py-2 rounded-lg transition-colors">
+                <i class="fas fa-plus mr-2"></i>Add Donor
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Connection Status Bar -->
+      <div id="connection-status" class="bg-blue-600 text-white py-2 hidden">
+        <div class="container mx-auto px-4 flex justify-between items-center">
+          <div class="flex items-center">
+            <i class="fas fa-sync-alt mr-2 animate-spin"></i>
+            <span>Syncing with Google Sheets...</span>
+          </div>
+          <button id="cancel-sync" class="text-sm hover:text-blue-200">
+            <i class="fas fa-times mr-1"></i>Cancel
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Content -->
+      <main class="flex-1 container mx-auto px-4 py-6">
+        <!-- Stats Cards with Real Data -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-red-100">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-gray-500 text-sm font-medium">Total Donors</p>
+                <p class="text-2xl font-bold text-red-700 mt-1" id="stat-total">0</p>
+              </div>
+              <div class="bg-red-50 p-3 rounded-lg">
+                <i class="fas fa-user-friends text-red-600 text-xl"></i>
+              </div>
+            </div>
+            <div class="mt-2 text-xs text-gray-500 flex items-center">
+              <i class="fas fa-database mr-1"></i>
+              <span>From Google Sheets</span>
+            </div>
+          </div>
+          
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-blue-100">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-gray-500 text-sm font-medium">Available Now</p>
+                <p class="text-2xl font-bold text-blue-700 mt-1" id="stat-available">0</p>
+              </div>
+              <div class="bg-blue-50 p-3 rounded-lg">
+                <i class="fas fa-check-circle text-blue-600 text-xl"></i>
+              </div>
+            </div>
+            <div class="mt-2 text-xs text-gray-500">
+              <i class="fas fa-clock mr-1"></i>
+              Updated <span id="stat-updated-time">just now</span>
+            </div>
+          </div>
+          
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-green-100">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-gray-500 text-sm font-medium">This Month</p>
+                <p class="text-2xl font-bold text-green-700 mt-1" id="stat-this-month">0</p>
+              </div>
+              <div class="bg-green-50 p-3 rounded-lg">
+                <i class="fas fa-calendar-alt text-green-600 text-xl"></i>
+              </div>
+            </div>
+            <div class="mt-2 text-xs text-gray-500">
+              <i class="fas fa-tint mr-1"></i>
+              Donations in current month
+            </div>
+          </div>
+          
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-purple-100">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-gray-500 text-sm font-medium">Most Needed</p>
+                <p class="text-2xl font-bold text-purple-700 mt-1" id="stat-most-needed">O+</p>
+              </div>
+              <div class="bg-purple-50 p-3 rounded-lg">
+                <i class="fas fa-exclamation-triangle text-purple-600 text-xl"></i>
+              </div>
+            </div>
+            <div class="mt-2 text-xs text-gray-500">
+              <i class="fas fa-filter mr-1"></i>
+              Based on requests
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter Section -->
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden mb-6">
+          <div class="border-b border-gray-200 bg-gray-50 px-5 py-4">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+              <div>
+                <h2 class="text-xl font-semibold text-gray-800">
+                  <i class="fas fa-filter text-red-600 mr-2"></i>
+                  Filter Donors
+                </h2>
+                <p class="text-gray-600 text-sm mt-1">Filter by blood group, availability, and last donation date</p>
+              </div>
+              
+              <div class="mt-2 md:mt-0 flex items-center space-x-3">
+                <div class="text-sm text-gray-600">
+                  <i class="fas fa-info-circle mr-1"></i>
+                  <span id="filtered-count">0</span> donors match your filters
+                </div>
+                <button id="reset-filters" class="px-3 py-1 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors">
+                  <i class="fas fa-times mr-1"></i>Clear All
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="p-5">
+            <!-- Blood Group Filters -->
+            <div class="mb-6">
+              <h3 class="font-medium text-gray-700 mb-3">Blood Group:</h3>
+              <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-3">
+                <button class="blood-group active bg-red-50 border-2 border-red-300 text-red-700 font-bold py-3 px-2 rounded-lg flex flex-col items-center justify-center" data-group="all">
+                  <span class="text-lg">ALL</span>
+                  <span class="text-xs font-normal mt-1" id="count-all">0</span>
+                </button>
+                
+                <button class="blood-group bg-red-50 border-2 border-red-200 text-red-700 font-bold py-3 px-2 rounded-lg flex flex-col items-center justify-center hover:bg-red-100" data-group="A+">
+                  <span class="text-xl">A+</span>
+                  <span class="text-xs font-normal mt-1" id="count-A+">0</span>
+                </button>
+                
+                <button class="blood-group bg-red-50 border-2 border-red-200 text-red-700 font-bold py-3 px-2 rounded-lg flex flex-col items-center justify-center hover:bg-red-100" data-group="A-">
+                  <span class="text-xl">A-</span>
+                  <span class="text-xs font-normal mt-1" id="count-A-">0</span>
+                </button>
+                
+                <button class="blood-group bg-red-50 border-2 border-red-200 text-red-700 font-bold py-3 px-2 rounded-lg flex flex-col items-center justify-center hover:bg-red-100" data-group="B+">
+                  <span class="text-xl">B+</span>
+                  <span class="text-xs font-normal mt-1" id="count-B+">0</span>
+                </button>
+                
+                <button class="blood-group bg-red-50 border-2 border-red-200 text-red-700 font-bold py-3 px-2 rounded-lg flex flex-col items-center justify-center hover:bg-red-100" data-group="B-">
+                  <span class="text-xl">B-</span>
+                  <span class="text-xs font-normal mt-1" id="count-B-">0</span>
+                </button>
+                
+                <button class="blood-group bg-red-50 border-2 border-red-200 text-red-700 font-bold py-3 px-2 rounded-lg flex flex-col items-center justify-center hover:bg-red-100" data-group="AB+">
+                  <span class="text-xl">AB+</span>
+                  <span class="text-xs font-normal mt-1" id="count-AB+">0</span>
+                </button>
+                
+                <button class="blood-group bg-red-50 border-2 border-red-200 text-red-700 font-bold py-3 px-2 rounded-lg flex flex-col items-center justify-center hover:bg-red-100" data-group="AB-">
+                  <span class="text-xl">AB-</span>
+                  <span class="text-xs font-normal mt-1" id="count-AB-">0</span>
+                </button>
+                
+                <button class="blood-group bg-red-50 border-2 border-red-200 text-red-700 font-bold py-3 px-2 rounded-lg flex flex-col items-center justify-center hover:bg-red-100" data-group="O+">
+                  <span class="text-xl">O+</span>
+                  <span class="text-xs font-normal mt-1" id="count-O+">0</span>
+                </button>
+                
+                <button class="blood-group bg-red-50 border-2 border-red-200 text-red-700 font-bold py-3 px-2 rounded-lg flex flex-col items-center justify-center hover:bg-red-100" data-group="O-">
+                  <span class="text-xl">O-</span>
+                  <span class="text-xs font-normal mt-1" id="count-O-">0</span>
+                </button>
+              </div>
+            </div>
+            
+            <!-- Additional Filters -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <h3 class="font-medium text-gray-700 mb-2">Last Donation:</h3>
+                <div class="flex flex-wrap gap-2">
+                  <button class="filter-btn px-3 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors" data-filter="lastDonation" data-value="3months">
+                    <i class="far fa-calendar mr-1"></i>Over 3 Months
+                  </button>
+                  <button class="filter-btn px-3 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors" data-filter="lastDonation" data-value="6months">
+                    <i class="far fa-calendar-alt mr-1"></i>Over 6 Months
+                  </button>
+                  <button class="filter-btn px-3 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors" data-filter="lastDonation" data-value="1year">
+                    <i class="far fa-calendar-times mr-1"></i>Over 1 Year
+                  </button>
+                </div>
+              </div>
+              
+              <div>
+                <h3 class="font-medium text-gray-700 mb-2">Availability:</h3>
+                <div class="flex flex-wrap gap-2">
+                  <button class="filter-btn active px-3 py-2 bg-green-100 text-green-700 border border-green-300 rounded-lg text-sm font-medium transition-colors" data-filter="availability" data-value="all">
+                    <i class="fas fa-users mr-1"></i>All Donors
+                  </button>
+                  <button class="filter-btn px-3 py-2 bg-green-50 text-green-700 hover:bg-green-100 rounded-lg text-sm font-medium transition-colors" data-filter="availability" data-value="available">
+                    <i class="fas fa-check-circle mr-1"></i>Available Now
+                  </button>
+                  <button class="filter-btn px-3 py-2 bg-green-50 text-green-700 hover:bg-green-100 rounded-lg text-sm font-medium transition-colors" data-filter="availability" data-value="not-available">
+                    <i class="fas fa-times-circle mr-1"></i>Not Available
+                  </button>
+                </div>
+              </div>
+              
+              <div>
+                <h3 class="font-medium text-gray-700 mb-2">Search:</h3>
+                <div class="relative">
+                  <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                  <input type="text" id="search-input" placeholder="Name, location, phone..." class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-red-300 focus:border-red-400 outline-none transition">
+                </div>
+                <div class="mt-2 text-xs text-gray-500 flex items-center">
+                  <i class="fas fa-lightbulb mr-1"></i>
+                  <span>Search in all donor fields</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Active Filters -->
+            <div id="active-filters" class="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200 hidden">
+              <div class="flex justify-between items-center mb-2">
+                <span class="text-sm font-medium text-gray-700">Active Filters:</span>
+                <button id="clear-filters" class="text-xs text-red-600 hover:text-red-800 font-medium">
+                  <i class="fas fa-times mr-1"></i>Clear All
+                </button>
+              </div>
+              <div id="filter-tags" class="flex flex-wrap gap-2">
+                <!-- Filter tags will appear here -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Donors List -->
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+          <div class="border-b border-gray-200 bg-gray-50 px-5 py-4 flex flex-col md:flex-row justify-between items-start md:items-center">
+            <div>
+              <h2 class="text-xl font-semibold text-gray-800">
+                <i class="fas fa-user-friends text-red-600 mr-2"></i>
+                Available Donors
+                <span class="text-red-600">(<span id="display-count">0</span>)</span>
+              </h2>
+              <p class="text-gray-600 text-sm mt-1" id="current-filter-text">Showing all donors from Google Sheets</p>
+            </div>
+            
+            <div class="flex items-center space-x-3 mt-2 md:mt-0">
+              <div class="flex items-center">
+                <span class="text-gray-700 text-sm mr-2">Sort by:</span>
+                <select id="sort-by" class="border border-gray-300 rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-red-300 focus:border-red-400 outline-none">
+                  <option value="name">Name (A-Z)</option>
+                  <option value="recent">Most Recent Donation</option>
+                  <option value="location">Location</option>
+                  <option value="donations">Most Donations</option>
+                  <option value="availability">Availability</option>
+                </select>
+              </div>
+              
+              <button id="export-data" class="px-4 py-2 bg-red-50 text-red-700 hover:bg-red-100 rounded-lg font-medium transition-colors text-sm">
+                <i class="fas fa-file-export mr-2"></i>Export
+              </button>
+            </div>
+          </div>
+          
+          <!-- Donors Container -->
+          <div class="p-5">
+            <!-- Loading State -->
+            <div id="loading-state" class="text-center py-12">
+              <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600 mx-auto mb-4"></div>
+              <p class="text-gray-700 font-medium">Loading donor data from Google Sheets...</p>
+              <p class="text-gray-500 text-sm mt-2">This may take a few moments</p>
+            </div>
+            
+            <!-- Donors Grid -->
+            <div id="donors-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 hidden">
+              <!-- Donor cards will be dynamically generated here -->
+            </div>
+            
+            <!-- No Results Message -->
+            <div id="no-results" class="text-center py-12 hidden">
+              <i class="fas fa-user-slash text-gray-300 text-6xl mb-4"></i>
+              <h3 class="text-xl font-medium text-gray-700 mb-2">No donors found</h3>
+              <p class="text-gray-500">Try adjusting your filters or check your Google Sheets connection</p>
+              <button id="retry-load" class="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors">
+                <i class="fas fa-redo mr-2"></i>Retry Loading Data
+              </button>
+            </div>
+            
+            <!-- Connection Error -->
+            <div id="connection-error" class="text-center py-12 hidden">
+              <i class="fas fa-exclamation-triangle text-red-300 text-6xl mb-4"></i>
+              <h3 class="text-xl font-medium text-gray-700 mb-2">Connection Error</h3>
+              <p class="text-gray-500 mb-4">Unable to connect to Google Sheets. Please check:</p>
+              <ul class="text-gray-600 text-sm text-left max-w-md mx-auto mb-4">
+                <li class="mb-1"><i class="fas fa-check text-red-500 mr-2"></i>Internet connection</li>
+                <li class="mb-1"><i class="fas fa-check text-red-500 mr-2"></i>Google Sheets URL is correct</li>
+                <li class="mb-1"><i class="fas fa-check text-red-500 mr-2"></i>Sheet is published to the web</li>
+              </ul>
+              <button id="retry-connection" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors">
+                <i class="fas fa-redo mr-2"></i>Retry Connection
+              </button>
+            </div>
+          </div>
+          
+          <!-- Pagination -->
+          <div id="pagination" class="border-t border-gray-200 px-5 py-4 bg-gray-50 flex justify-between items-center hidden">
+            <div class="text-sm text-gray-600">
+              Showing <span id="page-start">1</span>-<span id="page-end">10</span> of <span id="total-items">0</span> donors
+            </div>
+            <div class="flex items-center space-x-2">
+              <button id="prev-page" class="px-3 py-1 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                <i class="fas fa-chevron-left"></i>
+              </button>
+              <span class="text-sm text-gray-700">Page <span id="current-page">1</span> of <span id="total-pages">1</span></span>
+              <button id="next-page" class="px-3 py-1 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                <i class="fas fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Instructions Panel -->
+        <div class="mt-6 bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+          <h3 class="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+            <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+            How to Connect Your Google Sheets
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 class="font-medium text-gray-700 mb-2">Step 1: Prepare Your Google Sheet</h4>
+              <ul class="text-gray-600 text-sm space-y-2">
+                <li class="flex items-start">
+                  <i class="fas fa-check text-green-500 text-xs mt-1 mr-2"></i>
+                  Create a Google Sheet with these columns: <span class="font-medium">Name, Blood Group, Phone, Location, Last Donation (YYYY-MM-DD), Donations Count, Status (Available/Not Available)</span>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check text-green-500 text-xs mt-1 mr-2"></i>
+                  Make sure the sheet has a header row (first row with column names)
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check text-green-500 text-xs mt-1 mr-2"></i>
+                  Keep the data organized and consistent
+                </li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 class="font-medium text-gray-700 mb-2">Step 2: Publish Your Sheet</h4>
+              <ul class="text-gray-600 text-sm space-y-2">
+                <li class="flex items-start">
+                  <i class="fas fa-check text-green-500 text-xs mt-1 mr-2"></i>
+                  Go to <strong>File → Share → Publish to web</strong>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check text-green-500 text-xs mt-1 mr-2"></i>
+                  Choose <strong>"Entire Document"</strong> and <strong>"Web page"</strong> format
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check text-green-500 text-xs mt-1 mr-2"></i>
+                  Click <strong>"Publish"</strong> and copy the URL
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check text-green-500 text-xs mt-1 mr-2"></i>
+                  Paste the URL in the box below and click Connect
+                </li>
+              </ul>
+            </div>
+          </div>
+          
+          <div class="mt-4 pt-4 border-t border-blue-200">
+            <div class="flex flex-col md:flex-row gap-4">
+              <div class="flex-1">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Your Google Sheets URL:</label>
+                <div class="flex">
+                  <input type="text" id="sheets-url" placeholder="https://docs.google.com/spreadsheets/d/..." class="flex-1 border border-gray-300 rounded-l-lg px-4 py-2 focus:ring-2 focus:ring-red-300 focus:border-red-400 outline-none">
+                  <button id="connect-sheets" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-r-lg font-medium transition-colors">
+                    <i class="fas fa-plug mr-2"></i>Connect
+                  </button>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">Example URL: https://docs.google.com/spreadsheets/d/e/2PACX-1vQQ0v5MzOvK3mdShRV5oeyXO7GR4BeSaZJ3IZkOA3FV5_KvxUj87MUsbs-UXeTgHIxpgw4TapGEUdS3/pubhtml</p>
+              </div>
+              
+              <div class="flex items-center">
+                <div class="bg-white border border-gray-300 rounded-lg p-4">
+                  <div class="flex items-center">
+                    <div id="connection-status-indicator" class="w-3 h-3 bg-gray-400 rounded-full mr-2"></div>
+                    <span id="connection-status-text" class="text-sm font-medium">Not Connected</span>
+                  </div>
+                  <div class="mt-2 text-xs text-gray-500">
+                    Auto-refresh: <span id="auto-refresh-status" class="font-medium">30 seconds</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+      
+      <!-- Footer -->
+      <footer class="bg-gray-800 text-white py-6 mt-8">
+        <div class="container mx-auto px-4">
+          <div class="flex flex-col md:flex-row justify-between items-center">
+            <div class="mb-4 md:mb-0">
+              <p class="text-gray-300">
+                <i class="fas fa-heartbeat mr-2 text-red-400"></i>
+                Real-time Blood Donation Management System
+              </p>
+              <p class="text-gray-400 text-sm mt-1">Automatically syncs with Google Sheets • Live updates • Filter by blood group</p>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+              <div class="text-xs text-gray-400">
+                <i class="fas fa-database mr-1"></i>
+                Data Source: <span id="data-source-info" class="font-medium">Google Sheets</span>
+              </div>
+              <button id="view-sheet" class="text-gray-300 hover:text-white">
+                <i class="fas fa-external-link-alt mr-1"></i>View Sheet
+              </button>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <!-- Add Donor Modal -->
+    <div id="add-donor-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+      <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+          <h3 class="text-xl font-semibold text-gray-800">
+            <i class="fas fa-user-plus text-red-600 mr-2"></i>
+            Add New Donor
+          </h3>
+          <button id="close-modal" class="text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <div class="p-6">
+          <div class="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div class="flex items-center">
+              <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+              <p class="text-blue-700 text-sm">Note: This will add the donor to your connected Google Sheet. Make sure your sheet has proper columns.</p>
+            </div>
+          </div>
+          
+          <form id="add-donor-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>
+              <input type="text" id="donor-name" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-300 focus:border-red-400 outline-none" required>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Blood Group *</label>
+              <select id="donor-blood-group" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-300 focus:border-red-400 outline-none" required>
+                <option value="">Select Blood Group</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+              </select>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Phone Number *</label>
+              <input type="tel" id="donor-phone" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-300 focus:border-red-400 outline-none" required>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Location *</label>
+              <input type="text" id="donor-location" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-300 focus:border-red-400 outline-none" required>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Last Donation Date</label>
+              <input type="date" id="donor-last-donation" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-300 focus:border-red-400 outline-none">
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Total Donations</label>
+              <input type="number" id="donor-donations" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-300 focus:border-red-400 outline-none" min="0" value="0">
+            </div>
+            
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+              <div class="flex space-x-4">
+                <label class="flex items-center">
+                  <input type="radio" name="donor-status" value="Available" checked class="mr-2 text-red-600 focus:ring-red-500">
+                  <span class="text-gray-700">Available Now</span>
+                </label>
+                <label class="flex items-center">
+                  <input type="radio" name="donor-status" value="Not Available" class="mr-2 text-red-600 focus:ring-red-500">
+                  <span class="text-gray-700">Not Available</span>
+                </label>
+              </div>
+            </div>
+            
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
+              <textarea id="donor-notes" rows="3" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-300 focus:border-red-400 outline-none"></textarea>
+            </div>
+          </form>
+        </div>
+        
+        <div class="border-t border-gray-200 px-6 py-4 flex justify-end space-x-3">
+          <button id="cancel-add-donor" class="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition-colors">
+            Cancel
+          </button>
+          <button id="submit-donor" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors">
+            <i class="fas fa-plus mr-2"></i>Add Donor to Sheet
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- JavaScript for Real-time Google Sheets Integration -->
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        // Configuration
+        const config = {
+          defaultSheetsUrl: 'https://docs.google.com/spreadsheets/d/1FDJbhHEutcnbEfl16mzEH_Yxv702mwz2CIkF6yzCI9E/edit?usp=sharing',
+          autoRefreshInterval: 30000, // 30 seconds
+          itemsPerPage: 9
+        };
+        
+        // State
+        let state = {
+          donors: [],
+          filteredDonors: [],
+          currentFilters: {
+            bloodGroup: 'all',
+            availability: 'all',
+            lastDonation: null,
+            searchQuery: ''
+          },
+          currentPage: 1,
+          totalPages: 1,
+          isConnected: false,
+          currentSheetsUrl: '',
+          autoRefreshTimer: null,
+          lastUpdateTime: null
+        };
+        
+        // DOM Elements
+        const donorsContainer = document.getElementById('donors-container');
+        const loadingState = document.getElementById('loading-state');
+        const noResults = document.getElementById('no-results');
+        const connectionError = document.getElementById('connection-error');
+        const displayCount = document.getElementById('display-count');
+        const filteredCount = document.getElementById('filtered-count');
+        const currentFilterText = document.getElementById('current-filter-text');
+        const bloodGroupButtons = document.querySelectorAll('.blood-group');
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        const searchInput = document.getElementById('search-input');
+        const sortSelect = document.getElementById('sort-by');
+        const resetFiltersBtn = document.getElementById('reset-filters');
+        const clearFiltersBtn = document.getElementById('clear-filters');
+        const activeFiltersContainer = document.getElementById('active-filters');
+        const filterTagsContainer = document.getElementById('filter-tags');
+        const pagination = document.getElementById('pagination');
+        const prevPageBtn = document.getElementById('prev-page');
+        const nextPageBtn = document.getElementById('next-page');
+        const currentPageSpan = document.getElementById('current-page');
+        const totalPagesSpan = document.getElementById('total-pages');
+        const pageStartSpan = document.getElementById('page-start');
+        const pageEndSpan = document.getElementById('page-end');
+        const totalItemsSpan = document.getElementById('total-items');
+        const totalDonorsElement = document.getElementById('total-donors');
+        const statTotal = document.getElementById('stat-total');
+        const statAvailable = document.getElementById('stat-available');
+        const statThisMonth = document.getElementById('stat-this-month');
+        const statMostNeeded = document.getElementById('stat-most-needed');
+        const statUpdatedTime = document.getElementById('stat-updated-time');
+        const exportBtn = document.getElementById('export-data');
+        const realtimeIndicator = document.getElementById('realtime-indicator');
+        const lastUpdatedTime = document.getElementById('last-updated-time');
+        const manualRefreshBtn = document.getElementById('manual-refresh');
+        const connectionStatusBar = document.getElementById('connection-status');
+        const sheetsUrlInput = document.getElementById('sheets-url');
+        const connectSheetsBtn = document.getElementById('connect-sheets');
+        const connectionStatusIndicator = document.getElementById('connection-status-indicator');
+        const connectionStatusText = document.getElementById('connection-status-text');
+        const autoRefreshStatus = document.getElementById('auto-refresh-status');
+        const viewSheetBtn = document.getElementById('view-sheet');
+        const dataSourceInfo = document.getElementById('data-source-info');
+        const retryLoadBtn = document.getElementById('retry-load');
+        const retryConnectionBtn = document.getElementById('retry-connection');
+        const addDonorBtn = document.getElementById('add-donor-btn');
+        const addDonorModal = document.getElementById('add-donor-modal');
+        const closeModalBtn = document.getElementById('close-modal');
+        const cancelAddDonorBtn = document.getElementById('cancel-add-donor');
+        const submitDonorBtn = document.getElementById('submit-donor');
+        const addDonorForm = document.getElementById('add-donor-form');
+        
+        // Initialize
+        initializeApp();
+        
+        function initializeApp() {
+          // Set default sheets URL
+          sheetsUrlInput.value = config.defaultSheetsUrl;
+          state.currentSheetsUrl = config.defaultSheetsUrl;
+          
+          // Load data from default sheets URL
+          loadDataFromSheets(config.defaultSheetsUrl);
+          
+          // Set up event listeners
+          setupEventListeners();
+          
+          // Start auto-refresh timer
+          startAutoRefresh();
+        }
+        
+        function setupEventListeners() {
+          // Blood group filter buttons
+          bloodGroupButtons.forEach(button => {
+            button.addEventListener('click', function() {
+              const bloodGroup = this.getAttribute('data-group');
+              
+              // Update active button
+              bloodGroupButtons.forEach(btn => btn.classList.remove('active'));
+              this.classList.add('active');
+              
+              // Update filter
+              state.currentFilters.bloodGroup = bloodGroup;
+              
+              // Apply filters
+              applyFilters();
+            });
+          });
+          
+          // Other filter buttons
+          filterButtons.forEach(button => {
+            button.addEventListener('click', function() {
+              const filterType = this.getAttribute('data-filter');
+              const filterValue = this.getAttribute('data-value');
+              
+              // Toggle active state for availability buttons
+              if (filterType === 'availability') {
+                filterButtons.forEach(btn => {
+                  if (btn.getAttribute('data-filter') === 'availability') {
+                    btn.classList.remove('active', 'bg-green-100', 'border-green-300');
+                    btn.classList.add('bg-green-50');
+                  }
+                });
+                this.classList.add('active', 'bg-green-100', 'border-green-300');
+                this.classList.remove('bg-green-50');
+              }
+              
+              // Update filter
+              if (filterType === 'lastDonation') {
+                state.currentFilters.lastDonation = state.currentFilters.lastDonation === filterValue ? null : filterValue;
+              } else if (filterType === 'availability') {
+                state.currentFilters.availability = filterValue;
+              }
+              
+              // Apply filters
+              applyFilters();
+            });
+          });
+          
+          // Search input
+          searchInput.addEventListener('input', debounce(function() {
+            state.currentFilters.searchQuery = this.value.trim().toLowerCase();
+            applyFilters();
+          }, 300));
+          
+          // Sort select
+          sortSelect.addEventListener('change', function() {
+            applyFilters();
+          });
+          
+          // Reset filters
+          resetFiltersBtn.addEventListener('click', resetFilters);
+          clearFiltersBtn.addEventListener('click', resetFilters);
+          
+          // Pagination
+          prevPageBtn.addEventListener('click', () => changePage(-1));
+          nextPageBtn.addEventListener('click', () => changePage(1));
+          
+          // Export
+          exportBtn.addEventListener('click', exportData);
+          
+          // Manual refresh
+          manualRefreshBtn.addEventListener('click', function() {
+            loadDataFromSheets(state.currentSheetsUrl, true);
+          });
+          
+          // Connect sheets
+          connectSheetsBtn.addEventListener('click', function() {
+            const url = sheetsUrlInput.value.trim();
+            if (url) {
+              loadDataFromSheets(url, true);
+            } else {
+              showNotification('Please enter a valid Google Sheets URL', 'error');
+            }
+          });
+          
+          // View sheet
+          viewSheetBtn.addEventListener('click', function() {
+            if (state.currentSheetsUrl) {
+              window.open(state.currentSheetsUrl, '_blank');
+            }
+          });
+          
+          // Retry buttons
+          retryLoadBtn.addEventListener('click', function() {
+            loadDataFromSheets(state.currentSheetsUrl, true);
+          });
+          
+          retryConnectionBtn.addEventListener('click', function() {
+            loadDataFromSheets(state.currentSheetsUrl, true);
+          });
+          
+          // Add donor modal
+          addDonorBtn.addEventListener('click', function() {
+            addDonorModal.classList.remove('hidden');
+          });
+          
+          closeModalBtn.addEventListener('click', closeAddDonorModal);
+          cancelAddDonorBtn.addEventListener('click', closeAddDonorModal);
+          
+          submitDonorBtn.addEventListener('click', function() {
+            // In a real implementation, this would submit to Google Sheets API
+            // For demo, we'll just show a message
+            showNotification('In a real implementation, this would add the donor to your Google Sheet. To implement this, you would need to use the Google Sheets API with proper authentication.', 'info');
+            closeAddDonorModal();
+          });
+          
+          // Close modal when clicking outside
+          addDonorModal.addEventListener('click', function(e) {
+            if (e.target === addDonorModal) {
+              closeAddDonorModal();
+            }
+          });
+          
+          // Set last donation date to today by default
+          const today = new Date().toISOString().split('T')[0];
+          document.getElementById('donor-last-donation').value = today;
+        }
+        
+        function closeAddDonorModal() {
+          addDonorModal.classList.add('hidden');
+          addDonorForm.reset();
+          // Reset last donation to today
+          const today = new Date().toISOString().split('T')[0];
+          document.getElementById('donor-last-donation').value = today;
+        }
+        
+        function loadDataFromSheets(url, isManual = false) {
+          if (isManual) {
+            showConnectionStatus('Syncing with Google Sheets...');
+          }
+          
+          // Update state
+          state.currentSheetsUrl = url;
+          state.isConnected = false;
+          
+          // Hide error and show loading
+          connectionError.classList.add('hidden');
+          loadingState.classList.remove('hidden');
+          donorsContainer.classList.add('hidden');
+          pagination.classList.add('hidden');
+          
+          // Parse Google Sheets URL to get CSV export URL
+          const csvUrl = convertToCSVUrl(url);
+          
+          // Fetch data from Google Sheets
+          fetch(csvUrl)
+            .then(response => {
+              if (!response.ok) throw new Error('Network response was not ok');
+              return response.text();
+            })
+            .then(csvText => {
+              // Parse CSV data
+              const donors = parseCSVData(csvText);
+              
+              // Update state
+              state.donors = donors;
+              state.isConnected = true;
+              state.lastUpdateTime = new Date();
+              
+              // Update UI
+              updateBloodGroupCounts();
+              updateStats();
+              applyFilters();
+              
+              // Show success
+              loadingState.classList.add('hidden');
+              donorsContainer.classList.remove('hidden');
+              showNotification('Successfully loaded donor data from Google Sheets', 'success');
+              
+              // Update connection status
+              updateConnectionStatus(true);
+              if (isManual) {
+                hideConnectionStatus();
+              }
+              
+              // Update last updated time
+              updateLastUpdatedTime();
+              
+              // Update data source info
+              dataSourceInfo.textContent = 'Google Sheets (Connected)';
+              viewSheetBtn.onclick = () => window.open(url, '_blank');
+              
+              // Start auto-refresh if not already running
+              if (!state.autoRefreshTimer) {
+                startAutoRefresh();
+              }
+            })
+            .catch(error => {
+              console.error('Error loading data from Google Sheets:', error);
+              
+              // Show error
+              loadingState.classList.add('hidden');
+              connectionError.classList.remove('hidden');
+              
+              // Update connection status
+              updateConnectionStatus(false);
+              if (isManual) {
+                hideConnectionStatus();
+              }
+              
+              showNotification('Failed to load data from Google Sheets. Please check the URL and try again.', 'error');
+            });
+        }
+        
+        function convertToCSVUrl(url) {
+          // Convert Google Sheets HTML publish URL to CSV export URL
+          // This is a simplified conversion - may need adjustment for different sheet formats
+          
+          // If it's already a CSV URL, return as is
+          if (url.includes('/pub?output=csv')) {
+            return url;
+          }
+          
+          // Try to extract the sheet ID from the URL
+          const sheetIdMatch = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/) || 
+                               url.match(/\/spreadsheets\/d\/e\/([a-zA-Z0-9-_]+)/);
+          
+          if (sheetIdMatch && sheetIdMatch[1]) {
+            return `https://docs.google.com/spreadsheets/d/${sheetIdMatch[1]}/export?format=csv`;
+          }
+          
+          // If we can't extract, use a fallback method
+          // Replace /pubhtml with /pub?output=csv
+          return url.replace('/pubhtml', '/pub?output=csv').split('?')[0] + '?output=csv';
+        }
+        
+        function parseCSVData(csvText) {
+          const donors = [];
+          const lines = csvText.split('\n');
+          
+          // Skip header row if it exists
+          let startIndex = 0;
+          if (lines.length > 0) {
+            // Check if first line contains column headers
+            const firstLine = lines[0].toLowerCase();
+            if (firstLine.includes('name') || firstLine.includes('blood')) {
+              startIndex = 1;
+            }
+          }
+          
+          // Parse each line
+          for (let i = startIndex; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            // Simple CSV parsing (splitting by comma)
+            // Note: This may not handle commas within quoted values correctly
+            // For production, use a proper CSV parser library
+            const values = parseCSVLine(line);
+            
+            if (values.length >= 4) {
+              const donor = {
+                id: i + 1,
+                name: values[0]?.trim() || `Donor ${i}`,
+                bloodGroup: (values[1]?.trim() || 'Unknown').toUpperCase(),
+                phone: values[2]?.trim() || 'N/A',
+                location: values[3]?.trim() || 'Unknown',
+                lastDonation: values[4]?.trim() || getRandomDate(),
+                donations: parseInt(values[5]?.trim()) || Math.floor(Math.random() * 10) + 1,
+                status: (values[6]?.trim() || 'Available').toLowerCase().includes('available') ? 'Available' : 'Not Available',
+                notes: values[7]?.trim() || ''
+              };
+              
+              donors.push(donor);
+            }
+          }
+          
+          // If no data was parsed, create sample data for demo
+          if (donors.length === 0) {
+            donors.push(...createSampleData());
+          }
+          
+          return donors;
+        }
+        
+        function parseCSVLine(line) {
+          // Simple CSV parsing that handles quoted values
+          const values = [];
+          let currentValue = '';
+          let insideQuotes = false;
+          
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            
+            if (char === '"') {
+              insideQuotes = !insideQuotes;
+            } else if (char === ',' && !insideQuotes) {
+              values.push(currentValue);
+              currentValue = '';
+            } else {
+              currentValue += char;
+            }
+          }
+          
+          // Add the last value
+          values.push(currentValue);
+          
+          return values;
+        }
+        
+        function createSampleData() {
+          // Create sample data for demonstration
+          const sampleDonors = [];
+          const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+          const locations = ['Dhaka', 'Chittagong', 'Sylhet', 'Rajshahi', 'Khulna', 'Barisal', 'Rangpur', 'Mymensingh'];
+          const names = [
+            'Rahim Ahmed', 'Fatima Begum', 'Karim Khan', 'Ayesha Sultana', 
+            'Sohel Rana', 'Nadia Islam', 'Imran Hossain', 'Tasnim Rahman',
+            'Arif Chowdhury', 'Sabrina Akter', 'Kamal Uddin', 'Nusrat Jahan'
+          ];
+          
+          const today = new Date();
+          
+          for (let i = 0; i < 24; i++) {
+            const bloodGroup = bloodGroups[Math.floor(Math.random() * bloodGroups.length)];
+            const donationDate = new Date();
+            donationDate.setDate(today.getDate() - Math.floor(Math.random() * 365));
+            
+            sampleDonors.push({
+              id: i + 1,
+              name: names[Math.floor(Math.random() * names.length)] + ' ' + (i + 1),
+              bloodGroup: bloodGroup,
+              phone: `017${Math.floor(10000000 + Math.random() * 90000000)}`,
+              location: locations[Math.floor(Math.random() * locations.length)],
+              lastDonation: donationDate.toISOString().split('T')[0],
+              donations: Math.floor(Math.random() * 15) + 1,
+              status: Math.random() > 0.3 ? 'Available' : 'Not Available',
+              notes: ''
+            });
+          }
+          
+          return sampleDonors;
+        }
+        
+        function getRandomDate() {
+          const today = new Date();
+          const pastDate = new Date();
+          pastDate.setDate(today.getDate() - Math.floor(Math.random() * 365));
+          return pastDate.toISOString().split('T')[0];
+        }
+        
+        function updateBloodGroupCounts() {
+          const counts = {
+            'all': state.donors.length,
+            'A+': 0, 'A-': 0, 'B+': 0, 'B-': 0,
+            'AB+': 0, 'AB-': 0, 'O+': 0, 'O-': 0
+          };
+          
+          state.donors.forEach(donor => {
+            if (counts.hasOwnProperty(donor.bloodGroup)) {
+              counts[donor.bloodGroup]++;
+            }
+          });
+          
+          // Update count displays
+          for (const [group, count] of Object.entries(counts)) {
+            const element = document.getElementById(`count-${group}`);
+            if (element) {
+              element.textContent = count;
+            }
+          }
+          
+          // Update total donors
+          totalDonorsElement.textContent = state.donors.length;
+        }
+        
+        function updateStats() {
+          // Total donors
+          statTotal.textContent = state.donors.length;
+          
+          // Available donors
+          const availableCount = state.donors.filter(d => d.status === 'Available').length;
+          statAvailable.textContent = availableCount;
+          
+          // Donations this month (current month)
+          const currentMonth = new Date().getMonth();
+          const currentYear = new Date().getFullYear();
+          const thisMonthDonations = state.donors.reduce((total, donor) => {
+            const donationDate = new Date(donor.lastDonation);
+            if (donationDate.getMonth() === currentMonth && donationDate.getFullYear() === currentYear) {
+              return total + donor.donations;
+            }
+            return total;
+          }, 0);
+          statThisMonth.textContent = thisMonthDonations;
+          
+          // Most needed blood group (simulated)
+          const bloodGroupCounts = {};
+          state.donors.forEach(donor => {
+            bloodGroupCounts[donor.bloodGroup] = (bloodGroupCounts[donor.bloodGroup] || 0) + 1;
+          });
+          
+          // Find the blood group with the least donors (most needed)
+          let mostNeeded = 'O+';
+          let minCount = Infinity;
+          
+          for (const [group, count] of Object.entries(bloodGroupCounts)) {
+            if (count < minCount) {
+              minCount = count;
+              mostNeeded = group;
+            }
+          }
+          
+          statMostNeeded.textContent = mostNeeded;
+          
+          // Update stat updated time
+          if (state.lastUpdateTime) {
+            const timeDiff = Math.floor((new Date() - state.lastUpdateTime) / 1000);
+            if (timeDiff < 60) {
+              statUpdatedTime.textContent = 'just now';
+            } else if (timeDiff < 3600) {
+              statUpdatedTime.textContent = `${Math.floor(timeDiff / 60)} minutes ago`;
+            } else {
+              statUpdatedTime.textContent = `${Math.floor(timeDiff / 3600)} hours ago`;
+            }
+          }
+        }
+        
+        function applyFilters() {
+          // Apply all filters
+          state.filteredDonors = state.donors.filter(donor => {
+            // Blood group filter
+            if (state.currentFilters.bloodGroup !== 'all' && donor.bloodGroup !== state.currentFilters.bloodGroup) {
+              return false;
+            }
+            
+            // Availability filter
+            if (state.currentFilters.availability === 'available' && donor.status !== 'Available') {
+              return false;
+            }
+            if (state.currentFilters.availability === 'not-available' && donor.status !== 'Not Available') {
+              return false;
+            }
+            
+            // Last donation filter
+            if (state.currentFilters.lastDonation) {
+              const lastDonationDate = new Date(donor.lastDonation);
+              const today = new Date();
+              let monthsDiff = (today.getFullYear() - lastDonationDate.getFullYear()) * 12 + 
+                               (today.getMonth() - lastDonationDate.getMonth());
+              
+              if (state.currentFilters.lastDonation === '3months' && monthsDiff <= 3) {
+                return false;
+              } else if (state.currentFilters.lastDonation === '6months' && monthsDiff <= 6) {
+                return false;
+              } else if (state.currentFilters.lastDonation === '1year' && monthsDiff <= 12) {
+                return false;
+              }
+            }
+            
+            // Search filter
+            if (state.currentFilters.searchQuery) {
+              const searchStr = state.currentFilters.searchQuery;
+              const searchableText = `${donor.name} ${donor.bloodGroup} ${donor.location} ${donor.phone} ${donor.notes}`.toLowerCase();
+              if (!searchableText.includes(searchStr)) {
+                return false;
+              }
+            }
+            
+            return true;
+          });
+          
+          // Sort donors
+          sortDonors();
+          
+          // Update pagination
+          updatePagination();
+          
+          // Render donors
+          renderDonors();
+          
+          // Update filter text and counts
+          updateFilterText();
+          
+          // Update active filters display
+          updateActiveFiltersDisplay();
+        }
+        
+        function sortDonors() {
+          const sortBy = sortSelect.value;
+          
+          state.filteredDonors.sort((a, b) => {
+            switch(sortBy) {
+              case 'name':
+                return a.name.localeCompare(b.name);
+              case 'recent':
+                return new Date(b.lastDonation) - new Date(a.lastDonation);
+              case 'location':
+                return a.location.localeCompare(b.location);
+              case 'donations':
+                return b.donations - a.donations;
+              case 'availability':
+                if (a.status === b.status) return 0;
+                return a.status === 'Available' ? -1 : 1;
+              default:
+                return 0;
+            }
+          });
+        }
+        
+        function updatePagination() {
+          state.totalPages = Math.ceil(state.filteredDonors.length / config.itemsPerPage);
+          state.currentPage = Math.min(state.currentPage, Math.max(1, state.totalPages));
+          
+          // Update pagination UI
+          if (state.filteredDonors.length > config.itemsPerPage) {
+            pagination.classList.remove('hidden');
+            
+            currentPageSpan.textContent = state.currentPage;
+            totalPagesSpan.textContent = state.totalPages;
+            
+            const startIndex = (state.currentPage - 1) * config.itemsPerPage + 1;
+            const endIndex = Math.min(state.currentPage * config.itemsPerPage, state.filteredDonors.length);
+            
+            pageStartSpan.textContent = startIndex;
+            pageEndSpan.textContent = endIndex;
+            totalItemsSpan.textContent = state.filteredDonors.length;
+            
+            prevPageBtn.disabled = state.currentPage === 1;
+            nextPageBtn.disabled = state.currentPage === state.totalPages;
+          } else {
+            pagination.classList.add('hidden');
+          }
+        }
+        
+        function changePage(delta) {
+          const newPage = state.currentPage + delta;
+          if (newPage >= 1 && newPage <= state.totalPages) {
+            state.currentPage = newPage;
+            renderDonors();
+            updatePagination();
+          }
+        }
+        
+        function renderDonors() {
+          donorsContainer.innerHTML = '';
+          
+          if (state.filteredDonors.length === 0) {
+            noResults.classList.remove('hidden');
+            donorsContainer.classList.add('hidden');
+            return;
+          }
+          
+          noResults.classList.add('hidden');
+          donorsContainer.classList.remove('hidden');
+          
+          // Get donors for current page
+          const startIndex = (state.currentPage - 1) * config.itemsPerPage;
+          const endIndex = Math.min(startIndex + config.itemsPerPage, state.filteredDonors.length);
+          const donorsToShow = state.filteredDonors.slice(startIndex, endIndex);
+          
+          // Create donor cards
+          donorsToShow.forEach(donor => {
+            const card = createDonorCard(donor);
+            donorsContainer.appendChild(card);
+          });
+        }
+        
+        function createDonorCard(donor) {
+          const card = document.createElement('div');
+          card.className = 'donor-card bg-white border border-gray-200 rounded-xl p-5 shadow-sm';
+          
+          // Calculate days since last donation
+          const lastDonationDate = new Date(donor.lastDonation);
+          const today = new Date();
+          const timeDiff = today.getTime() - lastDonationDate.getTime();
+          const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
+          
+          // Determine status color
+          const statusColor = donor.status === 'Available' ? 'green' : 'gray';
+          const statusBg = donor.status === 'Available' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+          
+          card.innerHTML = `
+            <div class="flex justify-between items-start mb-4">
+              <div>
+                <h3 class="text-lg font-bold text-gray-800">${donor.name}</h3>
+                <p class="text-gray-600 text-sm">${donor.age || 'N/A'} years • ${donor.location}</p>
+              </div>
+              <div class="bg-red-50 border border-red-200 text-red-700 font-bold py-1 px-3 rounded-lg text-sm">
+                ${donor.bloodGroup}
+              </div>
+            </div>
+            
+            <div class="space-y-3 mb-5">
+              <div class="flex items-center">
+                <i class="fas fa-phone text-gray-400 mr-3 w-4"></i>
+                <span class="text-gray-700 text-sm">${donor.phone}</span>
+              </div>
+              <div class="flex items-center">
+                <i class="fas fa-tint text-gray-400 mr-3 w-4"></i>
+                <span class="text-gray-700 text-sm">${donor.donations} donations</span>
+              </div>
+              <div class="flex items-center">
+                <i class="fas fa-calendar-alt text-gray-400 mr-3 w-4"></i>
+                <span class="text-gray-700 text-sm">Last donation: ${formatDate(donor.lastDonation)}</span>
+              </div>
+              ${donor.notes ? `
+              <div class="flex items-start">
+                <i class="fas fa-sticky-note text-gray-400 mr-3 w-4 mt-1"></i>
+                <span class="text-gray-700 text-sm">${donor.notes}</span>
+              </div>
+              ` : ''}
+            </div>
+            
+            <div class="flex justify-between items-center">
+              <div class="${statusBg} px-3 py-1 rounded-full text-xs font-medium">
+                <i class="fas ${donor.status === 'Available' ? 'fa-check-circle' : 'fa-times-circle'} mr-1"></i>
+                ${donor.status} (${daysDiff} days ago)
+              </div>
+              
+              <button class="request-btn px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors" data-id="${donor.id}">
+                <i class="fas fa-hand-holding-heart mr-1"></i>Request
+              </button>
+            </div>
+          `;
+          
+          // Add event listener to request button
+          const requestBtn = card.querySelector('.request-btn');
+          requestBtn.addEventListener('click', function() {
+            showNotification(`Request sent to ${donor.name} (${donor.bloodGroup}) at ${donor.phone}`, 'success');
+            
+            // Visual feedback
+            this.innerHTML = '<i class="fas fa-check mr-1"></i>Requested';
+            this.classList.remove('bg-red-600', 'hover:bg-red-700');
+            this.classList.add('bg-green-600', 'hover:bg-green-700');
+            
+            setTimeout(() => {
+              this.innerHTML = '<i class="fas fa-hand-holding-heart mr-1"></i>Request';
+              this.classList.remove('bg-green-600', 'hover:bg-green-700');
+              this.classList.add('bg-red-600', 'hover:bg-red-700');
+            }, 3000);
+          });
+          
+          return card;
+        }
+        
+        function updateFilterText() {
+          const filteredCount = state.filteredDonors.length;
+          const totalCount = state.donors.length;
+          
+          displayCount.textContent = filteredCount;
+          filteredCount.textContent = filteredCount;
+          
+          let filterText = '';
+          const filters = [];
+          
+          if (state.currentFilters.bloodGroup !== 'all') {
+            filters.push(`Blood Group: ${state.currentFilters.bloodGroup}`);
+          }
+          
+          if (state.currentFilters.availability !== 'all') {
+            filters.push(`Availability: ${state.currentFilters.availability === 'available' ? 'Available Now' : 'Not Available'}`);
+          }
+          
+          if (state.currentFilters.lastDonation) {
+            let text = '';
+            if (state.currentFilters.lastDonation === '3months') text = 'Last Donation > 3 months';
+            else if (state.currentFilters.lastDonation === '6months') text = 'Last Donation > 6 months';
+            else if (state.currentFilters.lastDonation === '1year') text = 'Last Donation > 1 year';
+            filters.push(text);
+          }
+          
+          if (state.currentFilters.searchQuery) {
+            filters.push(`Search: "${state.currentFilters.searchQuery}"`);
+          }
+          
+          if (filters.length > 0) {
+            filterText = `Filtered by: ${filters.join(', ')}`;
+          } else {
+            filterText = 'Showing all donors';
+          }
+          
+          currentFilterText.textContent = filterText;
+        }
+        
+        function updateActiveFiltersDisplay() {
+          filterTagsContainer.innerHTML = '';
+          
+          const hasActiveFilters = 
+            state.currentFilters.bloodGroup !== 'all' || 
+            state.currentFilters.availability !== 'all' || 
+            state.currentFilters.lastDonation || 
+            state.currentFilters.searchQuery;
+          
+          if (hasActiveFilters) {
+            activeFiltersContainer.classList.remove('hidden');
+            
+            // Blood group filter tag
+            if (state.currentFilters.bloodGroup !== 'all') {
+              const tag = createFilterTag('Blood Group', state.currentFilters.bloodGroup, 'bloodGroup');
+              filterTagsContainer.appendChild(tag);
+            }
+            
+            // Availability filter tag
+            if (state.currentFilters.availability !== 'all') {
+              const value = state.currentFilters.availability === 'available' ? 'Available Now' : 'Not Available';
+              const tag = createFilterTag('Availability', value, 'availability');
+              filterTagsContainer.appendChild(tag);
+            }
+            
+            // Last donation filter tag
+            if (state.currentFilters.lastDonation) {
+              let text = '';
+              if (state.currentFilters.lastDonation === '3months') text = '> 3 months';
+              else if (state.currentFilters.lastDonation === '6months') text = '> 6 months';
+              else if (state.currentFilters.lastDonation === '1year') text = '> 1 year';
+              
+              const tag = createFilterTag('Last Donation', text, 'lastDonation');
+              filterTagsContainer.appendChild(tag);
+            }
+            
+            // Search filter tag
+            if (state.currentFilters.searchQuery) {
+              const tag = createFilterTag('Search', `"${state.currentFilters.searchQuery}"`, 'searchQuery');
+              filterTagsContainer.appendChild(tag);
+            }
+          } else {
+            activeFiltersContainer.classList.add('hidden');
+          }
+        }
+        
+        function createFilterTag(label, value, filterType) {
+          const tag = document.createElement('div');
+          tag.className = 'bg-red-50 text-red-800 px-3 py-1 rounded-full text-xs flex items-center';
+          tag.innerHTML = `
+            <span>${label}: ${value}</span>
+            <button class="ml-2 text-red-600 hover:text-red-800 remove-filter" data-type="${filterType}">
+              <i class="fas fa-times"></i>
+            </button>
+          `;
+          
+          const removeBtn = tag.querySelector('.remove-filter');
+          removeBtn.addEventListener('click', function() {
+            removeFilter(filterType);
+          });
+          
+          return tag;
+        }
+        
+        function removeFilter(filterType) {
+          switch(filterType) {
+            case 'bloodGroup':
+              state.currentFilters.bloodGroup = 'all';
+              bloodGroupButtons.forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.getAttribute('data-group') === 'all') {
+                  btn.classList.add('active');
+                }
+              });
+              break;
+            case 'availability':
+              state.currentFilters.availability = 'all';
+              filterButtons.forEach(btn => {
+                if (btn.getAttribute('data-filter') === 'availability') {
+                  btn.classList.remove('active', 'bg-green-100', 'border-green-300');
+                  btn.classList.add('bg-green-50');
+                  if (btn.getAttribute('data-value') === 'all') {
+                    btn.classList.add('active', 'bg-green-100', 'border-green-300');
+                  }
+                }
+              });
+              break;
+            case 'lastDonation':
+              state.currentFilters.lastDonation = null;
+              filterButtons.forEach(btn => {
+                if (btn.getAttribute('data-filter') === 'lastDonation') {
+                  btn.classList.remove('active');
+                }
+              });
+              break;
+            case 'searchQuery':
+              state.currentFilters.searchQuery = '';
+              searchInput.value = '';
+              break;
+          }
+          
+          applyFilters();
+        }
+        
+        function resetFilters() {
+          // Reset all filters
+          state.currentFilters = {
+            bloodGroup: 'all',
+            availability: 'all',
+            lastDonation: null,
+            searchQuery: ''
+          };
+          
+          // Reset UI
+          bloodGroupButtons.forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.getAttribute('data-group') === 'all') {
+              btn.classList.add('active');
+            }
+          });
+          
+          filterButtons.forEach(btn => {
+            btn.classList.remove('active', 'bg-green-100', 'border-green-300');
+            btn.classList.add('bg-green-50');
+            if (btn.getAttribute('data-filter') === 'availability' && btn.getAttribute('data-value') === 'all') {
+              btn.classList.add('active', 'bg-green-100', 'border-green-300');
+            }
+          });
+          
+          searchInput.value = '';
+          state.currentPage = 1;
+          
+          // Apply filters
+          applyFilters();
+        }
+        
+        function exportData() {
+          if (state.filteredDonors.length === 0) {
+            showNotification('No data to export', 'warning');
+            return;
+          }
+          
+          // Create CSV content
+          let csvContent = "data:text/csv;charset=utf-8,";
+          csvContent += "Name,Blood Group,Phone,Location,Last Donation,Donations,Status,Notes\n";
+          
+          state.filteredDonors.forEach(donor => {
+            const row = [
+              `"${donor.name}"`,
+              donor.bloodGroup,
+              donor.phone,
+              `"${donor.location}"`,
+              donor.lastDonation,
+              donor.donations,
+              donor.status,
+              `"${donor.notes || ''}"`
+            ].join(",");
+            csvContent += row + "\n";
+          });
+          
+          // Create download link
+          const encodedUri = encodeURI(csvContent);
+          const link = document.createElement("a");
+          link.setAttribute("href", encodedUri);
+          link.setAttribute("download", `blood_donors_${new Date().toISOString().split('T')[0]}.csv`);
+          document.body.appendChild(link);
+          
+          // Trigger download
+          link.click();
+          document.body.removeChild(link);
+          
+          showNotification(`Exported ${state.filteredDonors.length} donors to CSV`, 'success');
+        }
+        
+        function updateConnectionStatus(isConnected) {
+          if (isConnected) {
+            connectionStatusIndicator.className = 'w-3 h-3 bg-green-500 rounded-full mr-2';
+            connectionStatusText.textContent = 'Connected';
+            connectionStatusText.className = 'text-sm font-medium text-green-600';
+            realtimeIndicator.classList.remove('hidden');
+          } else {
+            connectionStatusIndicator.className = 'w-3 h-3 bg-red-500 rounded-full mr-2';
+            connectionStatusText.textContent = 'Not Connected';
+            connectionStatusText.className = 'text-sm font-medium text-red-600';
+            realtimeIndicator.classList.add('hidden');
+          }
+        }
+        
+        function showConnectionStatus(message) {
+          connectionStatusBar.querySelector('span').textContent = message;
+          connectionStatusBar.classList.remove('hidden');
+        }
+        
+        function hideConnectionStatus() {
+          setTimeout(() => {
+            connectionStatusBar.classList.add('hidden');
+          }, 2000);
+        }
+        
+        function updateLastUpdatedTime() {
+          if (!state.lastUpdateTime) return;
+          
+          const now = new Date();
+          const diffMs = now - state.lastUpdateTime;
+          const diffSec = Math.floor(diffMs / 1000);
+          
+          let timeText;
+          if (diffSec < 60) {
+            timeText = 'Just now';
+          } else if (diffSec < 3600) {
+            const minutes = Math.floor(diffSec / 60);
+            timeText = `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+          } else {
+            const hours = Math.floor(diffSec / 3600);
+            timeText = `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+          }
+          
+          lastUpdatedTime.textContent = timeText;
+        }
+        
+        function startAutoRefresh() {
+          // Clear existing timer
+          if (state.autoRefreshTimer) {
+            clearInterval(state.autoRefreshTimer);
+          }
+          
+          // Start new timer
+          state.autoRefreshTimer = setInterval(() => {
+            if (state.isConnected && state.currentSheetsUrl) {
+              loadDataFromSheets(state.currentSheetsUrl);
+            }
+          }, config.autoRefreshInterval);
+          
+          // Update auto-refresh status display
+          autoRefreshStatus.textContent = `${config.autoRefreshInterval / 1000} seconds`;
+        }
+        
+        function showNotification(message, type = 'info') {
+          // Create notification element
+          const notification = document.createElement('div');
+          notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 transform transition-transform duration-300 translate-x-full ${type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' : type === 'error' ? 'bg-red-100 text-red-800 border border-red-200' : 'bg-blue-100 text-blue-800 border border-blue-200'}`;
+          
+          notification.innerHTML = `
+            <div class="flex items-center">
+              <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'} mr-3"></i>
+              <span>${message}</span>
+            </div>
+          `;
+          
+          document.body.appendChild(notification);
+          
+          // Animate in
+          setTimeout(() => {
+            notification.classList.remove('translate-x-full');
+            notification.classList.add('translate-x-0');
+          }, 10);
+          
+          // Remove after 5 seconds
+          setTimeout(() => {
+            notification.classList.remove('translate-x-0');
+            notification.classList.add('translate-x-full');
+            
+            setTimeout(() => {
+              if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+              }
+            }, 300);
+          }, 5000);
+        }
+        
+        function formatDate(dateString) {
+          if (!dateString) return 'N/A';
+          
+          try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return 'Invalid Date';
+            
+            return date.toLocaleDateString('en-US', { 
+              year: 'numeric', 
+              month: 'short', 
+              day: 'numeric' 
+            });
+          } catch (e) {
+            return dateString;
+          }
+        }
+        
+        // Utility function: debounce
+        function debounce(func, wait) {
+          let timeout;
+          return function executedFunction(...args) {
+            const later = () => {
+              clearTimeout(timeout);
+              func.apply(this, args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+          };
+        }
+      });
+    </script>
+  </body>
+</html>
